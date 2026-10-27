@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>标题清理测试</title>
+</head>
+<body>
+  <h1>Lark 标题清理：浏览器自检</h1>
+  <p id="summary">测试中</p>
+  <ol id="results"></ol>
+  <script>
+    const prefix = '\u200B\u200C\u200D\u202C\u2061\u2062\u2063\u2064\uFEFF';
+    const realTitle = '文档标题';
+    document.title = prefix + realTitle + ' - 飞书云文档';
+  </script>
+  <script src="../lark-clean-title.user.js"></script>
+  <script>
+    const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+
+    function check(name, expected) {
+      if (document.title !== expected) {
+        throw new Error(`${name}: ${JSON.stringify(document.title)} !== ${JSON.stringify(expected)}`);
+      }
+      const item = document.createElement('li');
+      item.textContent = `通过：${name}`;
+      document.querySelector('#results').append(item);
+    }
+
+    (async () => {
+      check('首次加载：不可见前缀和中文后缀被移除', realTitle);
+
+      document.title = prefix + realTitle + ' - Feishu Docs';
+      await settle();
+      check('清理前缀和英文后缀', realTitle);
+
+      document.title = realTitle + '- 飞书云文档';
+      await settle();
+      check('无前缀时也清理中文后缀', realTitle);
+
+      document.title = '项目 - 工具-Feishu Docs   ';
+      await settle();
+      check('清理英文后缀和周围空格，保留正文连字符', '项目 - 工具');
+
+      document.title = 'Feishu Docs - 飞书云文档 使用说明';
+      await settle();
+      check('保留标题正文中的平台名称', 'Feishu Docs - 飞书云文档 使用说明');
+
+      document.title = prefix + '第二篇文档 - Lark Docs';
+      await settle();
+      check('动态设置 document.title', '第二篇文档 - Lark Docs');
+
+      document.querySelector('title').firstChild.data = prefix + '直接修改文本';
+      await settle();
+      check('直接修改 title 文本节点', '直接修改文本');
+
+      const replacement = document.createElement('title');
+      replacement.textContent = prefix + '替换后的标题';
+      document.querySelector('title').replaceWith(replacement);
+      await settle();
+      check('替换整个 title 节点', '替换后的标题');
+
+      document.querySelector('title').remove();
+      await settle();
+      check('title 暂时不存在', '');
+      document.title = prefix + realTitle;
+      await settle();
+      check('重新创建 title 节点', realTitle);
+
+      const emojiTitle = '👩‍💻 开发工具 👨‍👩‍👧‍👦';
+      document.title = prefix + emojiTitle + ' - 飞书云文档';
+      await settle();
+      check('清理前缀并保留 emoji 连接符', emojiTitle);
+
+      const joinerTitle = '文字\u200C连接\u200D测试';
+      document.title = prefix + joinerTitle;
+      await settle();
+      check('保留标题内部的文字连接符', joinerTitle);
+
+      document.title = '正常标题 & 运营';
+      await settle();
+      check('正常标题保持原样', '正常标题 & 运营');
+
+      document.title = prefix;
+      await settle();
+      check('只有控制字符时清空标题', '');
+
+      document.title = prefix + realTitle;
+      for (let i = 0; i < 20; i++) {
+        document.title = prefix + `切换文档 ${i}` + (i % 2 ? ' - Feishu Docs' : ' - 飞书云文档');
+        await settle();
+        if (document.title !== `切换文档 ${i}`) throw new Error('连续更新未被清理');
+      }
+      check('连续 20 次更新且无观察器循环', '切换文档 19');
+
+      document.querySelector('#summary').textContent = '15 项测试全部通过';
+    })().catch(error => {
+      document.querySelector('#summary').textContent = `测试失败：${error.message}`;
+      console.error(error);
+    });
+  </script>
+</body>
+</html>
